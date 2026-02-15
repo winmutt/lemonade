@@ -6,7 +6,7 @@ The `lemonade-server` command-line interface (CLI) provides a set of utility com
 
 - [Commands](#commands)
 - [Options for serve and run](#options-for-serve-and-run)
-  - [Environment Variables](#environment-variables) | [Custom Backend Binaries](#custom-backend-binaries) | [API Key and Security](#api-key-and-security)
+   - [Environment Variables](#environment-variables) | [Custom Backend Binaries](#custom-backend-binaries) | [API Key and Security](#api-key-and-security) | [Thread Affinity](#thread-affinity-and-cpu-topology)
 - [Options for pull](#options-for-pull)
 - [Lemonade Desktop App](#lemonade-desktop-app) | [Remote Server Connection](#remote-server-connection)
 
@@ -34,6 +34,9 @@ lemonade-server serve --port 8080 --log-level debug --llamacpp vulkan
 
 # Run a specific model with custom server settings
 lemonade-server run Qwen3-0.6B-GGUF --port 8080 --log-level debug --llamacpp rocm
+
+# Run with thread pinning for AMD Ryzen multi-die
+lemonade-server run Qwen3-0.6B-GGUF --threads 12 --affinity numa
 ```
 
 ## Options for serve and run
@@ -57,6 +60,8 @@ lemonade-server run MODEL_NAME [options]
 | `--extra-models-dir [path]`    | Experimental feature. Secondary directory to scan for LLM GGUF model files. Audio, embedding, reranking, and non-GGUF files are not supported, yet. | None |
 | `--max-loaded-models [N]`  | Maximum number of models to keep loaded per type slot (LLMs, audio, image, etc.). Use `-1` for unlimited. Example: `--max-loaded-models 5` allows up to 5 of each model type simultaneously. | `1` |
 | `--save-options` | Only available for the run command. Saves the context size, LlamaCpp backend and custom llama-server arguments as default for running this model. Unspecified values will be saved using their default value. | False |
+| `--threads [N]`                | Number of threads to use for inference. Auto-detects optimal thread count (75% of available cores, leaving 4 for system services). | Auto |
+| `--affinity [MODE]`            | Thread affinity mode for multi-core systems. Options: `auto` (auto-detect NUMA for multi-die AMD, CACHE otherwise), `numa` (pin to NUMA nodes), `cache` (pin to cache domains/CCDs), `compact` (fill cores compactly, use hyperthreads when filling). | `auto` |
 
 ### Environment Variables
 
@@ -74,6 +79,8 @@ These settings can also be provided via environment variables that Lemonade Serv
 | `LEMONADE_EXTRA_MODELS_DIR`        | Secondary directory to scan for GGUF model files                                                                                                        |
 | `LEMONADE_DISABLE_MODEL_FILTERING` | Set to `1` to disable hardware-based model filtering (e.g., RAM amount, NPU availability) and show all models regardless of system capabilities         |
 | `LEMONADE_ENABLE_DGPU_GTT`         | Set to `1` to include GTT for hardware-based model filtering |
+| `LEMONADE_THREADS`                 | Number of threads to use for inference (auto-detects optimal: 75% of cores, leaving 4 for system)                                                      |
+| `LEMONADE_AFFINITY`                | Thread affinity mode (`auto`, `numa`, `cache`, `compact`)                                                                                               |
 
 #### Custom Backend Binaries
 
@@ -87,6 +94,33 @@ You can provide your own `llama-server`, `whisper-server`, or `ryzenai-server` b
 | `LEMONADE_WHISPERCPP_CPU_BIN` | Path to custom `whisper-server` binary for CPU backend |
 | `LEMONADE_WHISPERCPP_NPU_BIN` | Path to custom `whisper-server` binary for NPU backend |
 | `LEMONADE_RYZENAI_SERVER_BIN` | Path to custom `ryzenai-server` binary for NPU/Hybrid models |
+
+#### Thread Affinity and CPU Topology
+
+On multi-core systems (especially AMD Ryzen with multiple CCDs), you can optimize performance by pinning threads to specific cores to prevent L3 cache bouncing between CCDs:
+
+- **Auto mode (`auto`)**: Automatically detects CPU topology and selects best affinity mode (NUMA for multi-die AMD, CACHE for simple topology)
+- **NUMA mode (`numa`)**: Pins threads to NUMA nodes - optimal for multi-die AMD Ryzen with multiple CCDs
+- **Cache mode (`cache`)**: Pins threads to cache domains (CCDs on AMD) - optimal for single-die CPUs
+- **Compact mode (`compact`)**: Fills cores compactly, using hyperthreads when all cores are in use
+
+**Examples:**
+
+```bash
+# Auto-detect optimal thread count and affinity
+lemonade-server serve
+
+# Use 12 threads with NUMA affinity for multi-die AMD
+lemonade-server serve --threads 12 --affinity numa
+
+# Use 8 threads with compact affinity (use hyperthreads)
+lemonade-server serve --threads 8 --affinity compact
+
+# Set via environment variables
+export LEMONADE_THREADS=12
+export LEMONADE_AFFINITY=numa
+lemonade-server serve
+```
 
 **Note:** These environment variables do not override the `--llamacpp` option. They allow you to specify an alternative binary for specific backends while still using the standard backend selection mechanism.
 
