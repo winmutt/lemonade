@@ -52,14 +52,14 @@ static const json CLI_OPTIONS = {
         {"option_name", "threads"},
         {"type_name", "N"},
         {"envname", "LEMONADE_THREADS"},
-        {"help", "Number of threads to use for inference"}
+        {"help", "Number of threads to use for inference. Auto-detects optimal thread count (75% of available cores, leaving 4 for system services)."}
     }},
     {"--affinity", {
         {"option_name", "affinity"},
         {"type_name", "MODE"},
         {"allowed_values", {"auto", "numa", "cache", "compact"}},
         {"envname", "LEMONADE_AFFINITY"},
-        {"help", "Thread affinity mode (auto, numa, cache, compact)"}
+        {"help", "Thread affinity mode for multi-core systems. Options: auto (auto-detect NUMA for multi-die AMD, CACHE otherwise), numa (pin to NUMA nodes), cache (pin to cache domains/CCDs), compact (fill cores compactly, use hyperthreads when filling)."}
     }},
     // sd.cpp backend selection option
     {"--sdcpp", {

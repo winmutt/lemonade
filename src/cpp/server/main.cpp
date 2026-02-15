@@ -65,6 +65,18 @@ int main(int argc, char** argv) {
             std::cout << "  Extra models dir: " << config.extra_models_dir << std::endl;
         }
 
+        // Output thread configuration
+        int thread_count = config.recipe_options.contains("threads") ? config.recipe_options["threads"].get<int>() : -1;
+        std::string affinity_mode = config.recipe_options.contains("affinity") ? config.recipe_options["affinity"] : "auto";
+
+        std::cout << "  Thread Configuration:" << std::endl;
+        if (thread_count > 0) {
+            std::cout << "    Threads: " << thread_count << std::endl;
+        } else {
+            std::cout << "    Threads: auto-detect (75% of cores, leaving 4 for system)" << std::endl;
+        }
+        std::cout << "    Affinity: " << affinity_mode << std::endl;
+
         Server server(config.port, config.host, config.log_level,
                     config.recipe_options, config.max_loaded_models,
                     config.extra_models_dir, config.no_broadcast);

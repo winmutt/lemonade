@@ -397,6 +397,30 @@ bool ServerManager::spawn_process() {
         cmdline += " --extra-models-dir \"" + extra_models_dir_ + "\"";
     }
 
+    // Output thread configuration
+    int thread_count = lemon::RecipeOptions::get_thread_count(recipe_options_);
+    lemon::AffinityMode affinity_mode = lemon::RecipeOptions::get_affinity_mode(recipe_options_);
+
+    std::string thread_config_msg = "[Server] Thread Configuration:\n";
+    if (thread_count > 0) {
+        thread_config_msg += "  Threads: " + std::to_string(thread_count) + "\n";
+    } else {
+        thread_config_msg += "  Threads: auto-detect (75% of cores, leaving 4 for system)\n";
+    }
+    thread_config_msg += "  Affinity: " + lemon::ThreadManager::affinity_mode_to_string(affinity_mode) + "\n";
+
+    std::cout << thread_config_msg;
+    std::cout.flush();
+
+    // Write to log file if specified
+    if (!log_file_.empty()) {
+        std::ofstream log_file(log_file_, std::ios::app);
+        if (log_file.is_open()) {
+            log_file << thread_config_msg;
+            log_file.flush();
+        }
+    }
+
     DEBUG_LOG(this, "Starting server: " << cmdline);
 
     STARTUPINFOA si = {};
