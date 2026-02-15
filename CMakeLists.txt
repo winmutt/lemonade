@@ -522,15 +522,15 @@ include_directories(
 # Source files
 set(SOURCES
     src/cpp/server/main.cpp
-src/cpp/server/server.cpp
-     src/cpp/server/router.cpp
-     src/cpp/server/cli_parser.cpp
-     src/cpp/server/model_manager.cpp
-     src/cpp/server/wrapped_server.cpp
-     src/cpp/server/streaming_proxy.cpp
-     src/cpp/server/system_info.cpp
-     src/cpp/server/thread_manager.cpp
-     src/cpp/server/recipe_options.cpp
+    src/cpp/server/server.cpp
+    src/cpp/server/router.cpp
+    src/cpp/server/cli_parser.cpp
+    src/cpp/server/model_manager.cpp
+    src/cpp/server/wrapped_server.cpp
+    src/cpp/server/streaming_proxy.cpp
+    src/cpp/server/system_info.cpp
+    src/cpp/server/thread_manager.cpp
+    src/cpp/server/recipe_options.cpp
     src/cpp/server/utils/http_client.cpp
     src/cpp/server/utils/json_utils.cpp
     src/cpp/server/utils/process_manager.cpp

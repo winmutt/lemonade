@@ -4,6 +4,8 @@
 #include <sstream>
 #include <algorithm>
 #include <numeric>
+#include <set>
+#include <fstream>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -66,15 +68,64 @@ int ThreadManager::detect_threads_per_core(int logical_threads, int physical_cor
 int ThreadManager::detect_ccds(const CpuTopology& topo) {
     if (!topo.is_amd) return 1;
 
+    // CCDs should be detected by examining L3 cache topology
+    // On AMD Ryzen, each CCD has its own L3 cache
+    // Try to read from /sys/devices/system/cpu/cpu*/cache/index3/ to count unique L3 cache IDs
+
+#ifdef __linux__
+    // Read L3 cache IDs from /sys/devices/system/cpu/cpu*/cache/index3/id
+    // Each unique L3 cache ID represents a CCD
+    try {
+        std::set<int> l3_cache_ids;
+
+        // Read from first CPU's L3 cache
+        for (int i = 0; i < topo.logical_threads; ++i) {
+            std::string path = "/sys/devices/system/cpu/cpu" + std::to_string(i) + "/cache/index3/id";
+            std::ifstream file(path);
+            if (file.is_open()) {
+                int cache_id;
+                if (file >> cache_id) {
+                    l3_cache_ids.insert(cache_id);
+                }
+            }
+        }
+
+        // If we found L3 cache IDs, return the count
+        if (!l3_cache_ids.empty()) {
+            return l3_cache_ids.size();
+        }
+    } catch (...) {
+        // Fall back to heuristic if reading fails
+    }
+
+    // Heuristic fallback based on physical cores
+    // Zen 1-3: 1 CCD per 8 cores (or less)
+    // Zen 4 (Ryzen 7000): 1 CCD per 16 cores (or 2 CCDs for 32 cores)
     if (topo.physical_cores <= 8) {
         return 1;
     } else if (topo.physical_cores <= 16) {
-        return 2;
+        return 1;
     } else if (topo.physical_cores <= 32) {
         return 2;
-    } else {
+    } else if (topo.physical_cores <= 64) {
         return 4;
+    } else {
+        return 8;
     }
+#else
+    // On non-Linux platforms, use heuristic based on core count
+    if (topo.physical_cores <= 8) {
+        return 1;
+    } else if (topo.physical_cores <= 16) {
+        return 1;
+    } else if (topo.physical_cores <= 32) {
+        return 2;
+    } else if (topo.physical_cores <= 64) {
+        return 4;
+    } else {
+        return 8;
+    }
+#endif
 }
 
 CpuTopology ThreadManager::detect_topology() {
