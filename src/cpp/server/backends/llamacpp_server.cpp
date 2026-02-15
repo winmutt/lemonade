@@ -6,6 +6,7 @@
 #include "lemon/utils/json_utils.h"
 #include "lemon/error_types.h"
 #include "lemon/system_info.h"
+#include "lemon/thread_manager.h"
 #include <iostream>
 #include <filesystem>
 #include <fstream>
@@ -243,6 +244,34 @@ void LlamaCppServer::load(const std::string& model_name,
     std::string llamacpp_backend = options.get_option("llamacpp_backend");
     std::string llamacpp_args = options.get_option("llamacpp_args");
 
+    // Thread management
+    int thread_count = options.get_thread_count();
+    AffinityMode affinity_mode = options.get_affinity_mode();
+
+    // Use ThreadManager for auto-detection
+    ThreadManager thread_manager;
+    CpuTopology topo = thread_manager.detect_topology();
+
+    // Auto-detect thread count if not specified
+    if (thread_count <= 0) {
+        thread_count = topo.logical_threads - 4;  // Leave 4 cores for system
+        thread_count = std::max(1, thread_count);
+        std::cout << "[LlamaCpp] Auto-detected thread count: " << thread_count << std::endl;
+    } else if (!thread_manager.validate_thread_count(thread_count, topo)) {
+        std::cout << "[LlamaCpp] Warning: Requested " << thread_count << " threads, but only "
+                  << topo.logical_threads << " available. Using "
+                  << (topo.logical_threads - 4) << " instead." << std::endl;
+        thread_count = std::max(1, topo.logical_threads - 4);
+    }
+
+    // Auto-detect affinity mode if not specified
+    if (affinity_mode == AffinityMode::AUTO) {
+        affinity_mode = ThreadManager::auto_detect_mode(topo);
+    }
+
+    std::cout << "[LlamaCpp] Thread count: " << thread_count << ", Affinity mode: "
+              << ThreadManager::affinity_mode_to_string(affinity_mode) << std::endl;
+
     bool use_gpu = (llamacpp_backend != "cpu");
 
     // Install llama-server if needed (use per-model backend)
@@ -285,6 +314,7 @@ void LlamaCppServer::load(const std::string& model_name,
     push_arg(args, reserved_flags, "--port", std::to_string(port_));
     push_arg(args, reserved_flags, "--jinja", std::vector<std::string>{"--no-jinja"});
 
+    push_arg(args, reserved_flags, "--parallel", std::to_string(thread_count));
     std::cout << "[LlamaCpp] Using backend: " << llamacpp_backend << "\n"
             << "[LlamaCpp] Use GPU: " << (use_gpu ? "true" : "false") << std::endl;
 

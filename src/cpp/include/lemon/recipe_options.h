@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 #include <CLI/CLI.hpp>
+#include <lemon/thread_manager.h>
 
 namespace lemon {
 
@@ -19,6 +20,13 @@ public:
 
     static void add_cli_options(CLI::App& app, json& storage);
     static std::vector<std::string> to_cli_options(const json& raw_options);
+
+    // Thread management getters
+    int get_thread_count() const;
+    AffinityMode get_affinity_mode() const;
+    bool has_thread_count() const;
+    bool has_affinity_mode() const;
+
 private:
     json options_ = json::object();
     std::string recipe_ = "";

@@ -15,6 +15,8 @@ static const json DEFAULTS = {
     {"llamacpp_backend", "vulkan"},  // Will be overridden dynamically
 #endif
     {"llamacpp_args", ""},
+    {"threads", -1},  // -1 means auto-detect
+    {"affinity", "auto"},
     {"sd-cpp_backend", "cpu"},  // sd.cpp backend selection (cpu or rocm)
     {"whispercpp_backend", "npu"},
     // Image generation defaults (for sd-cpp recipe)
@@ -44,6 +46,20 @@ static const json CLI_OPTIONS = {
         {"type_name", "ARGS"},
         {"envname", "LEMONADE_LLAMACPP_ARGS"},
         {"help", "Custom arguments to pass to llama-server (must not conflict with managed args)"}
+    }},
+    // Thread management options
+    {"--threads", {
+        {"option_name", "threads"},
+        {"type_name", "N"},
+        {"envname", "LEMONADE_THREADS"},
+        {"help", "Number of threads to use for inference"}
+    }},
+    {"--affinity", {
+        {"option_name", "affinity"},
+        {"type_name", "MODE"},
+        {"allowed_values", {"auto", "numa", "cache", "compact"}},
+        {"envname", "LEMONADE_AFFINITY"},
+        {"help", "Thread affinity mode (auto, numa, cache, compact)"}
     }},
     // sd.cpp backend selection option
     {"--sdcpp", {
@@ -90,7 +106,7 @@ static const json CLI_OPTIONS = {
 
 static std::vector<std::string> get_keys_for_recipe(const std::string& recipe) {
     if (recipe == "llamacpp") {
-        return {"ctx_size", "llamacpp_backend", "llamacpp_args"};
+        return {"ctx_size", "llamacpp_backend", "llamacpp_args", "threads", "affinity"};
     } else if (recipe == "whispercpp") {
         return {"whispercpp_backend"};
     } else if (recipe == "ryzenai-llm" || recipe == "flm") {
@@ -246,5 +262,27 @@ RecipeOptions RecipeOptions::inherit(const RecipeOptions& options) const {
 
 json RecipeOptions::get_option(const std::string& opt) const {
     return options_.contains(opt) ? options_[opt] : DEFAULTS[opt];
+}
+
+int RecipeOptions::get_thread_count() const {
+    if (!options_.contains("threads")) {
+        return -1;  // Not set, let system auto-detect
+    }
+    return options_["threads"];
+}
+
+AffinityMode RecipeOptions::get_affinity_mode() const {
+    if (!options_.contains("affinity")) {
+        return AffinityMode::AUTO;  // Default to auto
+    }
+    return ThreadManager::string_to_affinity_mode(options_["affinity"]);
+}
+
+bool RecipeOptions::has_thread_count() const {
+    return options_.contains("threads") && options_["threads"] != -1;
+}
+
+bool RecipeOptions::has_affinity_mode() const {
+    return options_.contains("affinity");
 }
 }
